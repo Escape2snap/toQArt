@@ -421,7 +421,7 @@ fn save_qr_frame(
                 gray < threshold
             };
 
-            weights[(QR_WIDTH - 1 - (x + PAD_L)) * QR_WIDTH + (y + PAD_T)] =
+            weights[(qr_width - 1 - (x + pad_l)) * qr_width + (y + pad_t)] =
                 WeightPixel::new(value, 127);
         }
     }
