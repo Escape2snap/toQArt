@@ -1,4 +1,4 @@
-# toqart
+# toQArt
 
 一个将视频/图片帧生成带有自定义内容或图案的 QR 码图片的小工具。
 
@@ -59,7 +59,7 @@ cargo build --release
 - `--pad-l <NUM>`                    左填充（默认：`2`）
 - `--pad-r <NUM>`                    右填充（默认：`2`）
 - `--content <TEXT>`                 二维码内容（默认：`Attention Is All You Need.`）
-- `--output-path <PATH>`             输出目录（默认：`./fuqr`）
+- `--output-path <PATH>`             输出目录（默认：`./toqart`）
 - `--create-config`                  创建默认 `toqart.toml`
 - `--help`                           显示帮助
 

@@ -191,7 +191,7 @@ fn show_help() {
     println!("  --pad-l <NUM>             Left padding [default: 2]");
     println!("  --pad-r <NUM>             Right padding [default: 2]");
     println!("  --content <TEXT>          QR code content [default: Attention Is All You Need.]");
-    println!("  --output-path <PATH>      Output directory [default: ./fuqr]");
+    println!("  --output-path <PATH>      Output directory [default: ./toqart]");
     println!("  --create-config           Create default configuration file");
     println!("  --help                    Show this help message");
     println!();

@@ -9,4 +9,4 @@ content = "Attention Is All You Need."
 
 [path]
 input_path = "example/101798742.jpg"
-output_path = "./fuqr"
+output_path = "./toqart"
