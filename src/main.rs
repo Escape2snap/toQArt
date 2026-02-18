@@ -412,13 +412,13 @@ fn save_qr_frame(
             let gray = ((r as u16 + g as u16 + b as u16) / 3) as u8;
 
             let value = if use_pattern {
-                if gray < 127 {
+                if gray < threshold {
                     (x + y) % 6 != 0 || (img_width - 1 - x + y) % 6 != 0
                 } else {
                     x % 6 == (y % 6) || x % 6 == (img_width - 1 - y) % 6
                 }
             } else {
-                gray < 127
+                gray < threshold
             };
 
             weights[(qr_width - 1 - (x + pad_l)) * qr_width + (y + pad_t)] =
@@ -469,7 +469,7 @@ fn save_qr_frame(
     let now = Local::now();
     
     let filename = format!(
-        "{}_{}_{:02}_{:02}_{:02}{:02}_{:02}{:02}_{:05}.png",
+        "{}_{}_{:02}_{:02}_{:02}{:02}_{:02}{:02}_{:04}_{:05}.png",
         now.timestamp(),
         source_filename,
         qr_version,
@@ -478,6 +478,7 @@ fn save_qr_frame(
         y_aspect,
         pad_l,
         pad_r,
+        threshold,
         frame_index
     );
     
