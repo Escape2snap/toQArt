@@ -30,6 +30,7 @@ struct QArtConfig {
     pad_l: usize,
     pad_r: usize,
     content: String,
+    threshold: u8,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -50,6 +51,7 @@ fn get_default_config() -> Config {
             pad_l: 2,
             pad_r: 2,
             content: "Attention Is All You Need.".to_string(),
+            threshold: 127,
         },
         path: PathConfig {
             input_path: "example/101798742.jpg".to_string(),
@@ -147,6 +149,14 @@ fn parse_cli_args(args: &[String]) -> Result<(Option<String>, Config), String> {
                     config.qart.pad_r = args[i].parse()
                         .map_err(|_| "Invalid pad-r".to_string())?;
                 }
+                "threshold" => {
+                    if i + 1 >= args.len() {
+                        return Err("--threshold requires a value".to_string());
+                    }
+                    i += 1;
+                    config.qart.threshold = args[i].parse()
+                        .map_err(|_| "Invalid threshold".to_string())?;
+                }
                 "content" => {
                     if i + 1 >= args.len() {
                         return Err("--content requires a value".to_string());
@@ -191,6 +201,7 @@ fn show_help() {
     println!("  --pad-l <NUM>             Left padding [default: 2]");
     println!("  --pad-r <NUM>             Right padding [default: 2]");
     println!("  --content <TEXT>          QR code content [default: Attention Is All You Need.]");
+    println!("  --threshold <NUM>         Gray threshold (0-255) used when weighting pixels [default: 127]");
     println!("  --output-path <PATH>      Output directory [default: ./toqart]");
     println!("  --create-config           Create default configuration file");
     println!("  --help                    Show this help message");
@@ -265,6 +276,7 @@ fn main() {
     let pad_l = config.qart.pad_l;
     let pad_r = config.qart.pad_r;
     let qr_content = config.qart.content.clone();
+    let threshold = config.qart.threshold;
     
     // Calculate dimensions
     let qr_width = qr_version * 4 + 17;
@@ -347,6 +359,7 @@ fn main() {
                     img_width,
                     img_height,
                     qr_width,
+                    threshold,
                     &qr_content,
                 );
             }
@@ -385,6 +398,7 @@ fn save_qr_frame(
     img_width: usize,
     img_height: usize,
     qr_width: usize,
+    threshold: u8,
     qr_content: &str,
 ) {
     let mut weights = vec![WeightPixel::new(false, 0); qr_width * qr_width];
@@ -408,7 +422,7 @@ fn save_qr_frame(
             };
 
             weights[(qr_width - 1 - (x + pad_l)) * qr_width + (y + pad_t)] =
-                WeightPixel::new(value, 127);
+                WeightPixel::new(value, threshold);
         }
     }
 

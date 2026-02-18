@@ -6,6 +6,7 @@ y_aspect = 1
 pad_l = 2
 pad_r = 2
 content = "Attention Is All You Need."
+threshold = 127
 
 [path]
 input_path = "example/101798742.jpg"

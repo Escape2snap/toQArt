@@ -58,16 +58,17 @@ cargo build --release
 
 ### 命令行参数
 
-- `--use-pattern <true|false>`       Use pattern mode（默认：`false`）
-- `--qr-version <NUM>`               QR 版本（默认：`11`）
-- `--x-aspect <NUM>`                 X 宽高比（默认：`1`）
-- `--y-aspect <NUM>`                 Y 宽高比（默认：`1`）
-- `--pad-l <NUM>`                    左填充（默认：`2`）
-- `--pad-r <NUM>`                    右填充（默认：`2`）
-- `--content <TEXT>`                 二维码内容（默认：`Attention Is All You Need.`）
-- `--output-path <PATH>`             输出目录（默认：`./toqart`）
-- `--create-config`                  创建默认 `toqart.toml`
-- `--help`                           显示帮助
+- `--use-pattern <true|false>`      使用图案模式（默认：`false`）
+- `--qr-version <NUM>`              QR 版本（默认：`11`）
+- `--x-aspect <NUM>`                X 宽高比（默认：`1`）
+- `--y-aspect <NUM>`                Y 宽高比（默认：`1`）
+- `--pad-l <NUM>`                   左填充（默认：`2`）
+- `--pad-r <NUM>`                   右填充（默认：`2`）
+- `--content <TEXT>`                二维码内容（默认：`Attention Is All You Need.`）
+- `--threshold <NUM>`               灰度阈值（0-255），用于加权像素（默认：`127`）
+- `--output-path <PATH>`            输出目录（默认：`./toqart`）
+- `--create-config`                 创建默认 `toqart.toml`
+- `--help`                          显示帮助
 
 ### 配置文件 toqart.toml 示例
 
@@ -80,6 +81,7 @@ y_aspect = 1
 pad_l = 2
 pad_r = 2
 content = "Attention Is All You Need."
+threshold = 127
 
 [path]
 input_path = "example/101798742.jpg"
