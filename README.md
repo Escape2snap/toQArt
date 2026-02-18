@@ -8,6 +8,12 @@
 - 可创建默认配置文件 `toqart.toml`。
 - 可自定义二维码内容（默认为 `Attention Is All You Need.`）。
 
+## 致謝。
+
+感謝 zhengkyl 的 fuqr 項目。
+本項目代碼近乎均來自於其項目。
+該項目為 zhengkyl/fuqr 項目中 examples/bad_apple.rs 的個人衍生。
+
 ## 快速开始
 
 1. 构建（发布版）：
