@@ -140,6 +140,13 @@ func oddVersion(v int) int {
 	return v
 }
 
+func boolFlag(s string) string {
+	if s == "true" {
+		return "1"
+	}
+	return "0"
+}
+
 // ── Handlers ─────────────────────────────────────────────
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -187,8 +194,9 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	io.Copy(dst, file)
 	dst.Close()
 
-	// ── Image pre-process ──
-	if r.FormValue("invert") == "true" {
+	// ── Image pre-process & config ──
+	mode := r.FormValue("mode")
+	if mode == "invert" {
 		if err := invertImage(inputPath); err != nil {
 			writeError(w, http.StatusInternalServerError, "图片反色失败: "+err.Error())
 			return
@@ -209,8 +217,20 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	padL := atoi(r.FormValue("pad_l"))
 	padR := atoi(r.FormValue("pad_r"))
 	scale := atoi(r.FormValue("scale"))
-	useColor := r.FormValue("use_color")
+	tintBrightness := atoi(r.FormValue("tint_brightness"))
 	colorThreshold := atoi(r.FormValue("color_threshold"))
+
+	useColor := "false"
+	useColorTint := "false"
+	invert := "false"
+	switch mode {
+	case "color":
+		useColor = "true"
+	case "tint":
+		useColorTint = "true"
+	case "invert":
+		invert = "true"
+	}
 
 	// ── Build & run toqart ──
 	outDir := filepath.Join(tmpDir, "output")
@@ -224,7 +244,13 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if useColor == "true" {
 		args = append(args, "--color", "true")
 	}
-	if useColor == "true" && colorThreshold > 0 {
+	if useColorTint == "true" {
+		args = append(args, "--color-tint", "true")
+		if tintBrightness > 0 {
+			args = append(args, "--tint-brightness", strconv.Itoa(tintBrightness))
+		}
+	}
+	if colorThreshold > 0 {
 		args = append(args, "--color-threshold", strconv.Itoa(colorThreshold))
 	}
 	if version > 0 {
@@ -271,8 +297,25 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "image/png")
+
+	now := time.Now()
+	flag := 0
+	var val int
+	if invert == "true" {
+		flag = 4
+	} else if useColor == "true" {
+		flag = 2
+		val = colorThreshold
+	} else if useColorTint == "true" {
+		flag = 1
+		val = tintBrightness
+	}
+	fname := fmt.Sprintf("toqart_%02d%02d_%02d%02d%02d_%02d_%04d_%d%s_%04d.png",
+		now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(),
+		version, threshold, flag, boolFlag(usePattern), val,
+	)
 	w.Header().Set("Content-Disposition",
-		fmt.Sprintf(`inline; filename="toqart_%d.png"`, time.Now().Unix()))
+		fmt.Sprintf(`inline; filename="%s"`, fname))
 	http.ServeFile(w, r, resultFile)
 }
 

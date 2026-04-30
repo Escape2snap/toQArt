@@ -25,6 +25,8 @@ struct Config {
 struct QArtConfig {
     use_pattern: bool,
     use_color: bool,
+    use_color_tint: bool,
+    tint_brightness: u8,
     use_color_threshold: u8,
     qr_version: usize,
     x_aspect: usize,
@@ -48,6 +50,8 @@ fn get_default_config() -> Config {
         qart: QArtConfig {
             use_pattern: false,
             use_color: false,
+            use_color_tint: false,
+            tint_brightness: 64,
             use_color_threshold: 0,
             qr_version: 11,
             x_aspect: 1,
@@ -127,6 +131,21 @@ fn parse_cli_args(args: &[String]) -> Result<(Option<String>, Config), String> {
                     i += 1;
                     config.qart.use_color_threshold = args[i].parse()
                         .map_err(|_| "Invalid color-threshold".to_string())?;
+                }
+                "color-tint" => {
+                    if i + 1 >= args.len() {
+                        return Err("--color-tint requires a value".to_string());
+                    }
+                    i += 1;
+                    config.qart.use_color_tint = parse_bool(&args[i])?;
+                }
+                "tint-brightness" => {
+                    if i + 1 >= args.len() {
+                        return Err("--tint-brightness requires a value".to_string());
+                    }
+                    i += 1;
+                    config.qart.tint_brightness = args[i].parse()
+                        .map_err(|_| "Invalid tint-brightness".to_string())?;
                 }
                 "qr-version" => {
                     if i + 1 >= args.len() {
@@ -215,7 +234,9 @@ fn show_help() {
     println!("Options:");
     println!("  --use-pattern <BOOL>      Use pattern mode (true/false) [default: false]");
     println!("  --color <BOOL>             Preserve original image colors (true/false) [default: false]");
-    println!("  --color-threshold <NUM>    Minimum grayscale to apply color (0-255) [default: 0]");
+    println!("  --color-tint <BOOL>        Tinted dark mode – darken with hue (true/false) [default: false]");
+    println!("  --tint-brightness <NUM>    Target brightness for tint mode (0-255) [default: 64]");
+    println!("  --color-threshold <NUM>    Minimum grayscale to apply color/tint (0-255) [default: 0]");
     println!("  --qr-version <NUM>        QR code version (number) [default: 11]");
     println!("  --x-aspect <NUM>          X aspect ratio [default: 1]");
     println!("  --y-aspect <NUM>          Y aspect ratio [default: 1]");
@@ -300,6 +321,8 @@ fn main() {
     let qr_content = config.qart.content.clone();
     let threshold = config.qart.threshold;
     let color_threshold = config.qart.use_color_threshold;
+    let use_color_tint = config.qart.use_color_tint;
+    let tint_brightness = config.qart.tint_brightness;
     
     // Calculate dimensions
     let qr_width = qr_version * 4 + 17;
@@ -374,7 +397,10 @@ fn main() {
                     source_filename,
                     use_pattern,
                     use_color,
-                    color_threshold,                    qr_version,
+                    use_color_tint,
+                    tint_brightness,
+                    color_threshold,
+                    qr_version,
                     x_aspect,
                     y_aspect,
                     pad_l,
@@ -414,6 +440,8 @@ fn save_qr_frame(
     source_filename: &str,
     use_pattern: bool,
     use_color: bool,
+    use_color_tint: bool,
+    tint_brightness: u8,
     color_threshold: u8,
     qr_version: usize,
     x_aspect: usize,
@@ -493,12 +521,26 @@ fn save_qr_frame(
         let (cr, cg, cb, pixel_gray) = colors[(qr_y * qr_width) + qr_x];
         let image_on = pixel_gray < threshold;
 
-        if use_color && in_image_area && on && image_on {
-            if pixel_gray > color_threshold {
-                Rgb([cr, cg, cb])
-            } else {
-                Rgb([0, 0, 0])
-            }
+        // Keep QR structure elements (finder, format, version) always black/white
+        let is_structure = module.has(Module::FINDER)
+            || module.has(Module::FORMAT)
+            || module.has(Module::VERSION);
+
+        let can_color = use_color && in_image_area && on && image_on
+            && !is_structure && pixel_gray > color_threshold;
+
+        let can_tint = use_color_tint && in_image_area && on && image_on
+            && !is_structure && pixel_gray > color_threshold;
+
+        if can_color {
+            Rgb([cr, cg, cb])
+        } else if can_tint {
+            let factor = (tint_brightness as f32 / (pixel_gray.max(1) as f32)).min(1.0);
+            Rgb([
+                (cr as f32 * factor) as u8,
+                (cg as f32 * factor) as u8,
+                (cb as f32 * factor) as u8,
+            ])
         } else if on {
             Rgb([0, 0, 0])
         } else {
@@ -509,11 +551,13 @@ fn save_qr_frame(
     let now = Local::now();
     
     let filename = format!(
-        "{}_{}_{:02}{:02}_{:02}_{:02}{:02}_{:02}{:02}_{:04}_{:05}.png",
+        "{}_{}_{:02}{:02}{:02}_{:03}_{:02}_{:02}{:02}_{:02}{:02}_{:04}_{:05}.png",
         now.timestamp(),
         source_filename,
         if use_pattern { 1 } else { 0 },
         if use_color { 1 } else { 0 },
+        if use_color_tint { 1 } else { 0 },
+        tint_brightness,
         qr_version,
         x_aspect,
         y_aspect,

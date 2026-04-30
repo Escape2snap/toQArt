@@ -68,6 +68,21 @@ h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
   border-color: #007aff; box-shadow: 0 0 0 3px rgba(0,122,255,0.15);
 }
 .config-item input[type="checkbox"] { accent-color: #007aff; }
+
+.mode-group {
+  grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 4px 0;
+}
+.mode-group input[type="radio"] { display: none; }
+.mode-group label {
+  padding: 6px 16px; border-radius: 8px; border: 1px solid #d2d2d7;
+  cursor: pointer; font-size: 13px; color: #3a3a3c; transition: all 0.15s;
+  user-select: none;
+}
+.mode-group input[type="radio"]:checked + label {
+  border-color: #007aff; background: #f0f7ff; color: #007aff; font-weight: 600;
+}
+
 .config-item.checkbox-row {
   display: flex; align-items: center; gap: 8px;
 }
@@ -105,7 +120,7 @@ h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
 
 /* ── Result ── */
 .result-card { display: none; }
-.result-card.show { display: block; }
+.result-card.show { display: block; margin-top: 24px; }
 .result-card img {
   max-width: 100%; max-height: 500px; border-radius: 8px;
   display: block; margin: 0 auto;
@@ -232,22 +247,25 @@ h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
                value="127" min="0" max="255">
         <span class="slider-val" id="thresholdVal">127</span>
       </div>
-      <div class="config-item checkbox-row full">
-        <input type="checkbox" id="invert" name="invert" value="true">
-        <label for="invert">图片反色</label>
-      </div>
-
       <hr class="section-divider">
       <div class="section-label">样式</div>
 
-      <div class="config-item checkbox-row">
+      <div class="config-item checkbox-row full">
         <input type="checkbox" id="use_pattern" name="use_pattern" value="true">
         <label for="use_pattern">图案模式</label>
       </div>
-      <div class="config-item checkbox-row">
-        <input type="checkbox" id="use_color" name="use_color" value="true">
-        <label for="use_color">保留原图颜色</label>
+
+      <div class="mode-group" id="modeGroup">
+        <input type="radio" name="mode" id="mode_none" value="none" checked>
+        <label for="mode_none">无</label>
+        <input type="radio" name="mode" id="mode_invert" value="invert">
+        <label for="mode_invert">图片反色</label>
+        <input type="radio" name="mode" id="mode_color" value="color">
+        <label for="mode_color">保留原图颜色</label>
+        <input type="radio" name="mode" id="mode_tint" value="tint">
+        <label for="mode_tint">颜色色调</label>
       </div>
+
       <div class="config-item full slider-row" id="colorThresholdGroup" style="display:none">
         <label for="color_threshold" style="white-space:nowrap">
           颜色灰度下限 <span class="hint">(0-255)</span>
@@ -255,6 +273,14 @@ h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
         <input type="range" id="color_threshold" name="color_threshold"
                value="0" min="0" max="255">
         <span class="slider-val" id="colorThresholdVal">0</span>
+      </div>
+      <div class="config-item full slider-row" id="tintGroup" style="display:none">
+        <label for="tint_brightness" style="white-space:nowrap">
+          色调强度 <span class="hint">(0-255)</span>
+        </label>
+        <input type="range" id="tint_brightness" name="tint_brightness"
+               value="64" min="0" max="255">
+        <span class="slider-val" id="tintBrightnessVal">64</span>
       </div>
 
     </form>
@@ -327,16 +353,26 @@ function init() {
     thresholdVal.textContent = thresholdSlider.value;
     renderThreshold();
   });
-  $('invert').addEventListener('change', renderThreshold);
-  const colorCheckbox = $('use_color');
+  const modeRadios = document.querySelectorAll('input[name="mode"]');
   const colorThresholdSlider = $('color_threshold');
   const colorThresholdVal = $('colorThresholdVal');
   const colorThresholdGroup = $('colorThresholdGroup');
-  colorCheckbox.addEventListener('change', () => {
-    colorThresholdGroup.style.display = colorCheckbox.checked ? '' : 'none';
-  });
+  const tintSlider = $('tint_brightness');
+  const tintVal = $('tintBrightnessVal');
+  const tintGroup = $('tintGroup');
+
+  function updateMode() {
+    const v = document.querySelector('input[name="mode"]:checked').value;
+    colorThresholdGroup.style.display = v === 'color' ? '' : 'none';
+    tintGroup.style.display = v === 'tint' ? '' : 'none';
+    renderThreshold();
+  }
+  modeRadios.forEach(r => r.addEventListener('change', updateMode));
   colorThresholdSlider.addEventListener('input', () => {
     colorThresholdVal.textContent = colorThresholdSlider.value;
+  });
+  tintSlider.addEventListener('input', () => {
+    tintVal.textContent = tintSlider.value;
   });
   generateBtn.addEventListener('click', generate);
   $('downloadBtn').addEventListener('click', downloadResult);
@@ -367,7 +403,7 @@ function handleFile(file) {
 function renderThreshold() {
   if (!sourceImage) return;
   const threshold = parseInt(thresholdSlider.value);
-  const invert = $('invert').checked;
+  const invert = document.querySelector('input[name="mode"]:checked').value === 'invert';
   const w = sourceImage.naturalWidth;
   const h = sourceImage.naturalHeight;
 
