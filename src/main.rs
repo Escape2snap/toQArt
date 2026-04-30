@@ -24,6 +24,8 @@ struct Config {
 #[derive(Deserialize, Serialize)]
 struct QArtConfig {
     use_pattern: bool,
+    use_color: bool,
+    use_color_threshold: u8,
     qr_version: usize,
     x_aspect: usize,
     y_aspect: usize,
@@ -45,6 +47,8 @@ fn get_default_config() -> Config {
     Config {
         qart: QArtConfig {
             use_pattern: false,
+            use_color: false,
+            use_color_threshold: 0,
             qr_version: 11,
             x_aspect: 1,
             y_aspect: 1,
@@ -108,6 +112,21 @@ fn parse_cli_args(args: &[String]) -> Result<(Option<String>, Config), String> {
                     }
                     i += 1;
                     config.qart.use_pattern = parse_bool(&args[i])?;
+                }
+                "color" => {
+                    if i + 1 >= args.len() {
+                        return Err("--color requires a value".to_string());
+                    }
+                    i += 1;
+                    config.qart.use_color = parse_bool(&args[i])?;
+                }
+                "color-threshold" => {
+                    if i + 1 >= args.len() {
+                        return Err("--color-threshold requires a value".to_string());
+                    }
+                    i += 1;
+                    config.qart.use_color_threshold = args[i].parse()
+                        .map_err(|_| "Invalid color-threshold".to_string())?;
                 }
                 "qr-version" => {
                     if i + 1 >= args.len() {
@@ -195,6 +214,8 @@ fn show_help() {
     println!();
     println!("Options:");
     println!("  --use-pattern <BOOL>      Use pattern mode (true/false) [default: false]");
+    println!("  --color <BOOL>             Preserve original image colors (true/false) [default: false]");
+    println!("  --color-threshold <NUM>    Minimum grayscale to apply color (0-255) [default: 0]");
     println!("  --qr-version <NUM>        QR code version (number) [default: 11]");
     println!("  --x-aspect <NUM>          X aspect ratio [default: 1]");
     println!("  --y-aspect <NUM>          Y aspect ratio [default: 1]");
@@ -270,6 +291,7 @@ fn main() {
     
     // Extract configuration values
     let use_pattern = config.qart.use_pattern;
+    let use_color = config.qart.use_color;
     let qr_version = config.qart.qr_version;
     let x_aspect = config.qart.x_aspect;
     let y_aspect = config.qart.y_aspect;
@@ -277,13 +299,15 @@ fn main() {
     let pad_r = config.qart.pad_r;
     let qr_content = config.qart.content.clone();
     let threshold = config.qart.threshold;
+    let color_threshold = config.qart.use_color_threshold;
     
     // Calculate dimensions
     let qr_width = qr_version * 4 + 17;
     let img_width = qr_width - (pad_l + pad_r);
     let img_height = ((img_width * y_aspect) / x_aspect) | 1;
-    let pad_t = (qr_width - img_height as usize) / 2 - 1;
-    let pad_b = (qr_width - img_height as usize) / 2 + 1;
+    let diff = qr_width.saturating_sub(img_height as usize);
+    let pad_t = diff / 2;
+    let pad_b = diff - pad_t;
     
     let video_path = if config.path.input_path.is_empty() {
         println!("[INFO] Please enter the video file path:");
@@ -349,7 +373,8 @@ fn main() {
                     output_dir, 
                     source_filename,
                     use_pattern,
-                    qr_version,
+                    use_color,
+                    color_threshold,                    qr_version,
                     x_aspect,
                     y_aspect,
                     pad_l,
@@ -382,12 +407,14 @@ fn main() {
 }
 
 fn save_qr_frame(
-    frame: &[u8], 
-    frame_stride: usize, 
-    frame_index: u32, 
-    output_dir: &str, 
+    frame: &[u8],
+    frame_stride: usize,
+    frame_index: u32,
+    output_dir: &str,
     source_filename: &str,
     use_pattern: bool,
+    use_color: bool,
+    color_threshold: u8,
     qr_version: usize,
     x_aspect: usize,
     y_aspect: usize,
@@ -402,6 +429,7 @@ fn save_qr_frame(
     qr_content: &str,
 ) {
     let mut weights = vec![WeightPixel::new(false, 0); qr_width * qr_width];
+    let mut colors = vec![(0u8, 0u8, 0u8, 0u8); qr_width * qr_width];
     
     for y in 0..img_height {
         for x in 0..img_width {
@@ -423,6 +451,7 @@ fn save_qr_frame(
 
             weights[(qr_width - 1 - (x + pad_l)) * qr_width + (y + pad_t)] =
                 WeightPixel::new(value, 127);
+            colors[(qr_width - 1 - (x + pad_l)) * qr_width + (y + pad_t)] = (r, g, b, gray);
         }
     }
 
@@ -448,19 +477,30 @@ fn save_qr_frame(
         let qr_y = (y - margin) as usize;
         let module = qr_code.matrix.get(qr_x, qr_y);
 
+        let in_image_area = qr_x >= pad_t
+            && qr_x <= qr_width - 1 - pad_b
+            && qr_y >= pad_l
+            && qr_y <= qr_width - 1 - pad_r;
+
         let on = if (module.has(Module::TIMING) || module.has(Module::ALIGNMENT))
-            && (qr_x >= pad_t
-                && qr_x <= qr_width - 1 - pad_b
-                && qr_y >= pad_l
-                && qr_y <= qr_width - 1 - pad_r)
+            && in_image_area
         {
             weights[(qr_y * qr_width) + qr_x].value().clone()
         } else {
             module.has(Module::ON)
         };
-        
-        if on {
-            Rgb([0 as u8, 0, 0])
+
+        let (cr, cg, cb, pixel_gray) = colors[(qr_y * qr_width) + qr_x];
+        let image_on = pixel_gray < threshold;
+
+        if use_color && in_image_area && on && image_on {
+            if pixel_gray > color_threshold {
+                Rgb([cr, cg, cb])
+            } else {
+                Rgb([0, 0, 0])
+            }
+        } else if on {
+            Rgb([0, 0, 0])
         } else {
             Rgb([255, 255, 255])
         }
@@ -469,11 +509,12 @@ fn save_qr_frame(
     let now = Local::now();
     
     let filename = format!(
-        "{}_{}_{:02}_{:02}_{:02}{:02}_{:02}{:02}_{:04}_{:05}.png",
+        "{}_{}_{:02}{:02}_{:02}_{:02}{:02}_{:02}{:02}_{:04}_{:05}.png",
         now.timestamp(),
         source_filename,
-        qr_version,
         if use_pattern { 1 } else { 0 },
+        if use_color { 1 } else { 0 },
+        qr_version,
         x_aspect,
         y_aspect,
         pad_l,

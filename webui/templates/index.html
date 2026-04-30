@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>toQArt WebUI</title>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f5f5f7; color: #1d1d1f; min-height: 100vh;
+}
+.container { max-width: 960px; margin: 0 auto; padding: 40px 20px; }
+h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.subtitle { color: #6e6e73; font-size: 14px; margin-bottom: 32px; }
+
+/* ── Card ── */
+.card {
+  background: #fff; border-radius: 16px; padding: 28px;
+  margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+/* ── Upload Zone ── */
+.upload-zone {
+  border: 2px dashed #c7c7cc; border-radius: 12px;
+  padding: 40px 20px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: #007aff; background: #f0f7ff;
+}
+.upload-zone.has-image { border-style: solid; border-color: #34c759; padding: 16px; }
+.upload-icon { font-size: 40px; margin-bottom: 8px; }
+.upload-text { color: #6e6e73; font-size: 14px; }
+.upload-text strong { color: #007aff; }
+.upload-hint { font-size: 12px; color: #86868b; margin-top: 4px; }
+.file-info { font-size: 13px; color: #34c759; margin-top: 8px; }
+
+/* ── Preview Side-by-Side ── */
+.preview-row { display: flex; gap: 16px; align-items: flex-start; justify-content: center; }
+.preview-col { flex: 1; min-width: 0; text-align: center; }
+.preview-label {
+  font-size: 12px; font-weight: 600; color: #6e6e73;
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.preview-col img, .preview-col canvas {
+  max-width: 100%; max-height: 300px; border-radius: 8px;
+  display: block; margin: 0 auto; background: #fff;
+}
+.preview-col canvas { border: 1px solid #e8e8ed; }
+
+/* ── Config Grid ── */
+.config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.config-grid .full { grid-column: 1 / -1; }
+.config-item label {
+  display: block; font-size: 13px; font-weight: 500;
+  margin-bottom: 4px; color: #3a3a3c;
+}
+.config-item label .hint { font-weight: 400; color: #86868b; }
+.config-item input:not([type="checkbox"]):not([type="range"]),
+.config-item select {
+  width: 100%; padding: 8px 12px; border: 1px solid #d2d2d7;
+  border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s;
+}
+.config-item input:focus, .config-item select:focus {
+  border-color: #007aff; box-shadow: 0 0 0 3px rgba(0,122,255,0.15);
+}
+.config-item input[type="checkbox"] { accent-color: #007aff; }
+.config-item.checkbox-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.config-item.checkbox-row label { margin-bottom: 0; cursor: pointer; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row label { min-width: 120px; flex-shrink: 0; }
+.slider-row input[type="range"] { flex: 1; accent-color: #007aff; }
+.slider-val {
+  min-width: 32px; text-align: center; font-weight: 600; color: #007aff;
+  font-size: 14px;
+}
+.section-divider {
+  grid-column: 1 / -1; border: none; border-top: 1px solid #e8e8ed;
+  margin: 4px 0;
+}
+.section-label {
+  grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: #86868b;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0;
+}
+
+/* ── Buttons ── */
+.submit-row { text-align: center; margin-top: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 36px; border: none; border-radius: 12px;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-primary { background: #007aff; color: #fff; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: #e8e8ed; color: #1d1d1f; padding: 10px 24px; font-size: 14px; }
+.btn-secondary:hover { background: #d8d8dd; }
+
+/* ── Result ── */
+.result-card { display: none; }
+.result-card.show { display: block; }
+.result-card img {
+  max-width: 100%; max-height: 500px; border-radius: 8px;
+  display: block; margin: 0 auto;
+}
+.result-actions {
+  display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap;
+}
+
+/* ── Loading ── */
+.loading { text-align: center; padding: 40px; display: none; }
+.loading.show { display: block; }
+.spinner {
+  width: 40px; height: 40px; border: 4px solid #e8e8ed;
+  border-top-color: #007aff; border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error & Toast ── */
+.error-msg {
+  background: #fff2f0; border: 1px solid #ffccc7; border-radius: 8px;
+  padding: 12px 16px; color: #cf1322; font-size: 14px;
+  display: none; white-space: pre-wrap;
+}
+.error-msg.show { display: block; }
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #323232; color: #fff; padding: 10px 24px; border-radius: 10px;
+  font-size: 14px; font-weight: 500; opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none; z-index: 999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .config-grid { grid-template-columns: 1fr; }
+  .preview-row { flex-direction: column; }
+  .container { padding: 20px 12px; }
+  .card { padding: 20px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>toQArt WebUI</h1>
+  <p class="subtitle">将图片生成为带有自定义内容的 QR 码</p>
+
+  <!-- Step 1: Upload -->
+  <div class="card">
+    <div class="card-title">1. 上传图片</div>
+    <div class="upload-zone" id="uploadZone">
+      <div id="uploadPlaceholder">
+        <div class="upload-icon">🖼️</div>
+        <div class="upload-text">拖拽图片到此处，或 <strong>点击选择</strong></div>
+        <div class="upload-hint">支持 PNG、JPEG 等格式</div>
+      </div>
+      <div id="uploadPreview" style="display:none">
+        <div class="preview-row">
+          <div class="preview-col">
+            <div class="preview-label">原始图片</div>
+            <img id="previewImg" alt="preview">
+          </div>
+          <div class="preview-col">
+            <div class="preview-label">阈值预览</div>
+            <canvas id="thresholdCanvas"></canvas>
+          </div>
+        </div>
+        <div class="file-info" id="fileInfo"></div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+  </div>
+
+  <!-- Step 2: Config -->
+  <div class="card">
+    <div class="card-title">2. QR 码配置</div>
+    <form id="configForm" class="config-grid">
+
+      <!-- QR Content -->
+      <div class="config-item full">
+        <label for="content">二维码内容</label>
+        <input type="text" id="content" name="content"
+               value="Attention Is All You Need." placeholder="要编码的文本或 URL">
+      </div>
+
+      <hr class="section-divider">
+      <div class="section-label">尺寸</div>
+
+      <div class="config-item">
+        <label for="qr_version">QR 版本 <span class="hint">(奇数)</span></label>
+        <input type="number" id="qr_version" name="qr_version" value="11" min="1" max="39" step="2">
+      </div>
+      <div class="config-item">
+        <label for="scale">放大倍数</label>
+        <input type="number" id="scale" name="scale" value="4" min="1" max="20">
+      </div>
+      <div class="config-item">
+        <label for="x_aspect">X 宽高比</label>
+        <input type="number" id="x_aspect" name="x_aspect" value="1" min="1">
+      </div>
+      <div class="config-item">
+        <label for="y_aspect">Y 宽高比</label>
+        <input type="number" id="y_aspect" name="y_aspect" value="1" min="1">
+      </div>
+      <div class="config-item">
+        <label for="pad_l">左填充</label>
+        <input type="number" id="pad_l" name="pad_l" value="2" min="0">
+      </div>
+      <div class="config-item">
+        <label for="pad_r">右填充</label>
+        <input type="number" id="pad_r" name="pad_r" value="2" min="0">
+      </div>
+
+      <hr class="section-divider">
+      <div class="section-label">图像处理</div>
+
+      <div class="config-item full slider-row">
+        <label for="threshold" style="white-space:nowrap">
+          灰度阈值 <span class="hint">(0-255)</span>
+        </label>
+        <input type="range" id="threshold" name="threshold"
+               value="127" min="0" max="255">
+        <span class="slider-val" id="thresholdVal">127</span>
+      </div>
+      <div class="config-item checkbox-row full">
+        <input type="checkbox" id="invert" name="invert" value="true">
+        <label for="invert">图片反色</label>
+      </div>
+
+      <hr class="section-divider">
+      <div class="section-label">样式</div>
+
+      <div class="config-item checkbox-row">
+        <input type="checkbox" id="use_pattern" name="use_pattern" value="true">
+        <label for="use_pattern">图案模式</label>
+      </div>
+      <div class="config-item checkbox-row">
+        <input type="checkbox" id="use_color" name="use_color" value="true">
+        <label for="use_color">保留原图颜色</label>
+      </div>
+      <div class="config-item full slider-row" id="colorThresholdGroup" style="display:none">
+        <label for="color_threshold" style="white-space:nowrap">
+          颜色灰度下限 <span class="hint">(0-255)</span>
+        </label>
+        <input type="range" id="color_threshold" name="color_threshold"
+               value="0" min="0" max="255">
+        <span class="slider-val" id="colorThresholdVal">0</span>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Generate -->
+  <div class="submit-row">
+    <button class="btn btn-primary" id="generateBtn">生成 QR 码</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div style="color:#6e6e73;font-size:14px">正在生成二维码，请稍候…</div>
+  </div>
+
+  <!-- Result -->
+  <div class="card result-card" id="resultCard">
+    <div class="card-title">3. 结果</div>
+    <img id="resultImg" alt="QR Code">
+    <div class="result-actions">
+      <button class="btn btn-secondary" id="downloadBtn">下载图片</button>
+      <button class="btn btn-secondary" id="copyBtn">复制到剪贴板</button>
+    </div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ── State ──
+let currentFile = null;
+let sourceImage = null;
+let resultBlob = null;
+let toastTimer = null;
+
+// ── DOM Refs ──
+const $ = (id) => document.getElementById(id);
+const uploadZone     = $('uploadZone');
+const fileInput      = $('fileInput');
+const placeholder    = $('uploadPlaceholder');
+const preview        = $('uploadPreview');
+const previewImg     = $('previewImg');
+const fileInfo       = $('fileInfo');
+const thresholdSlider = $('threshold');
+const thresholdVal   = $('thresholdVal');
+const canvas         = $('thresholdCanvas');
+const ctx            = canvas.getContext('2d');
+const generateBtn    = $('generateBtn');
+const loading        = $('loading');
+const resultCard     = $('resultCard');
+const resultImg      = $('resultImg');
+const errorMsg       = $('errorMsg');
+
+// ── Init ──
+function init() {
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+  thresholdSlider.addEventListener('input', () => {
+    thresholdVal.textContent = thresholdSlider.value;
+    renderThreshold();
+  });
+  $('invert').addEventListener('change', renderThreshold);
+  const colorCheckbox = $('use_color');
+  const colorThresholdSlider = $('color_threshold');
+  const colorThresholdVal = $('colorThresholdVal');
+  const colorThresholdGroup = $('colorThresholdGroup');
+  colorCheckbox.addEventListener('change', () => {
+    colorThresholdGroup.style.display = colorCheckbox.checked ? '' : 'none';
+  });
+  colorThresholdSlider.addEventListener('input', () => {
+    colorThresholdVal.textContent = colorThresholdSlider.value;
+  });
+  generateBtn.addEventListener('click', generate);
+  $('downloadBtn').addEventListener('click', downloadResult);
+  $('copyBtn').addEventListener('click', copyResult);
+}
+
+// ── Upload ──
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) {
+    return showError('请选择图片文件');
+  }
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    previewImg.src = e.target.result;
+    placeholder.style.display = 'none';
+    preview.style.display = 'block';
+    uploadZone.classList.add('has-image');
+    fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    const img = new Image();
+    img.onload = () => { sourceImage = img; renderThreshold(); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Threshold Preview ──
+function renderThreshold() {
+  if (!sourceImage) return;
+  const threshold = parseInt(thresholdSlider.value);
+  const invert = $('invert').checked;
+  const w = sourceImage.naturalWidth;
+  const h = sourceImage.naturalHeight;
+
+  const MAX = 300;
+  let pw = w, ph = h;
+  if (w > h && w > MAX)      { pw = MAX; ph = Math.round(h * MAX / w); }
+  else if (h > MAX)           { ph = MAX; pw = Math.round(w * MAX / h); }
+
+  canvas.width = pw; canvas.height = ph;
+  ctx.drawImage(sourceImage, 0, 0, pw, ph);
+  const data = ctx.getImageData(0, 0, pw, ph).data;
+  const out = ctx.createImageData(pw, ph);
+
+  for (let i = 0; i < data.length; i += 4) {
+    let gray = (data[i] + data[i+1] + data[i+2]) / 3;
+    if (invert) gray = 255 - gray;
+    const val = gray < threshold ? 0 : 255;
+    out.data[i] = out.data[i+1] = out.data[i+2] = val;
+    out.data[i+3] = 255;
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
+// ── Generate ──
+async function generate() {
+  if (!currentFile) return showError('请先上传一张图片');
+
+  hideError();
+  generateBtn.disabled = true;
+  loading.classList.add('show');
+  resultCard.classList.remove('show');
+
+  const formData = new FormData();
+  formData.append('image', currentFile);
+  const fd = new FormData($('configForm'));
+  for (const [k, v] of fd) formData.append(k, v);
+  if (!formData.has('use_pattern')) formData.append('use_pattern', 'false');
+
+  let qv = parseInt(formData.get('qr_version'));
+  if (qv > 0 && qv % 2 === 0) formData.set('qr_version', String(qv + 1));
+
+  try {
+    const resp = await fetch('/generate', { method: 'POST', body: formData });
+    if (!resp.ok) throw new Error(await resp.text());
+    resultBlob = await resp.blob();
+    resultImg.src = URL.createObjectURL(resultBlob);
+    resultCard.classList.add('show');
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    generateBtn.disabled = false;
+    loading.classList.remove('show');
+  }
+}
+
+// ── Result Actions ──
+function downloadResult() {
+  if (!resultBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(resultBlob);
+  a.download = `toqart_${Date.now()}.png`;
+  a.click();
+}
+
+async function copyResult() {
+  if (!resultBlob) return;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': resultBlob })]);
+    showToast('已复制到剪贴板');
+  } catch {
+    showToast('复制失败，请使用下载按钮');
+  }
+}
+
+// ── Feedback ──
+function showToast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('show'); }
+function hideError()    { errorMsg.classList.remove('show'); }
+
+// ── Boot ──
+init();
+</script>
+</body>
+</html>
