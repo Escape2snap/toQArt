@@ -1,80 +1,96 @@
 # toQArt
 
-一个将视频/图片帧生成带有自定义内容或图案的 QR 码图片的小工具。
+将图片生成带有自定义内容的 QR 码。
 
-主要特性：
-- 支持通过 FFmpeg 读取并处理视频或图像（PNG、JPEG 等）。
-- 命令行参数与 `toqart.toml` 配置合并（优先级：命令行 > toml > 默认值）。
-- 可创建默认配置文件 `toqart.toml`。
-- 可自定义二维码内容（默认为 `Attention Is All You Need.`）。
+## 特性
 
-## 致謝。
-
-感謝 zhengkyl 的 fuqr 項目。
-本項目代碼近乎均來自於其項目。
-該項目為 zhengkyl/fuqr 項目中 examples/bad_apple.rs 的個人衍生。
+- 通过 FFmpeg 读取图片或视频，编码为 QR 码
+- **保留原图颜色** — 用原始像素颜色替换黑色模块
+- **颜色色调** — 将原图颜色压暗到统一亮度，保留色调同时保证扫码可靠性
+- **图片反色** — 预处理时反转图片颜色
+- **图案模式** — 基于阈值和网格的装饰性图案
+- 支持 WebUI 和命令行两种使用方式
+- 配置与 `toqart.toml` 文件合并（优先级：CLI > toml > 默认值）
 
 ## 快速开始
 
-1. 构建（发布版）：
+### 构建
 
 ```bash
+# 需要 Rust、Go、FFmpeg 开发库
 cargo build --release
-# 可执行文件： target/release/toqart
+
+# 构建 WebUI（可选）
+cd webui && go build -o toqart-webui main.go && cd ..
 ```
 
-2. 生成默认配置文件：
+### 命令行使用
 
 ```bash
-./target/release/toqart --create-config
-```
-
-3. 使用示例：
-
-- 使用默认参数处理图片：
-
-```bash
+# 基本用法
 ./target/release/toqart ./example/101798742.jpg
+
+# 保留原图颜色
+./target/release/toqart --color true ./example/101798742.jpg
+
+# 颜色色调模式（与 --color 互斥）
+./target/release/toqart --color-tint true --tint-brightness 64 ./example/101798742.jpg
+
+# 调高灰度阈值使 QR 更密集
+./target/release/toqart --threshold 180 --content "https://example.com" ./example/101798742.jpg
 ```
 
-- 指定二维码内容和输出目录：
+### WebUI
 
 ```bash
-./target/release/toqart --content "https://example.com" --output-path ./out ./example/101798742.jpg
+cd webui
+./toqart-webui                    # 默认端口 5462
+./toqart-webui --port 8080        # 指定端口
 ```
 
-- 指定部分或全部参数：
+浏览器打开 `http://localhost:5462`。
 
-```bash
-./target/release/toqart \
-  --use-pattern true \
-  --qr-version 12 \
-  --x-aspect 1 --y-aspect 1 \
-  --pad-l 2 --pad-r 2 \
-  --content "Attention Is All You Need." \
-  --output-path ./toqart \
-  ./example/101798742.jpg
-```
+## 参数说明
 
-### 命令行参数
+| 参数 | 范围 | 默认 | 说明 |
+|------|------|------|------|
+| `--content` | 文本 | `Attention Is All You Need.` | QR 码编码内容 |
+| `--threshold` | 0-255 | `127` | 灰度阈值，低于此值的像素标记为"on" |
+| `--qr-version` | 1-40 | `11` | QR 码版本（自动修正为奇数） |
+| `--x-aspect` | ≥1 | `1` | X 方向宽高比 |
+| `--y-aspect` | ≥1 | `1` | Y 方向宽高比 |
+| `--pad-l` | ≥0 | `2` | 左填充（模块数） |
+| `--pad-r` | ≥0 | `2` | 右填充（模块数） |
+| `--use-pattern` | bool | `false` | 启用装饰性图案模式 |
 
-- `--use-pattern <true|false>`      使用图案模式（默认：`false`）
-- `--qr-version <NUM>`              QR 版本（默认：`11`）
-- `--x-aspect <NUM>`                X 宽高比（默认：`1`）
-- `--y-aspect <NUM>`                Y 宽高比（默认：`1`）
-- `--pad-l <NUM>`                   左填充（默认：`2`）
-- `--pad-r <NUM>`                   右填充（默认：`2`）
-- `--content <TEXT>`                二维码内容（默认：`Attention Is All You Need.`）
-- `--threshold <NUM>`               灰度阈值（0-255），用于加权像素（默认：`127`）
-- `--output-path <PATH>`            输出目录（默认：`./toqart`）
-- `--create-config`                 创建默认 `toqart.toml`
-- `--help`                          显示帮助
+### 颜色/色调参数
 
-### 配置文件 toqart.toml 示例
+互斥模式（三选一）：
+
+| 模式 | 参数 | 说明 |
+|------|------|------|
+| 保留原图颜色 | `--color true` | 替换"on"模块为原始像素颜色 |
+| 颜色色调 | `--color-tint true` | 压暗颜色至统一亮度，保留色调 |
+| 图片反色 | 预处理时反转 | 通过 `mode=invert` 在 WebUI 中启用 |
+
+通用颜色参数：
+
+| 参数 | 范围 | 默认 | 说明 |
+|------|------|------|------|
+| `--color-threshold` | 0-255 | `0` | 颜色/色调应用的最低灰度值。低于此值的像素保持纯黑 |
+| `--tint-brightness` | 0-255 | `64` | 色调模式的目标亮度。越低越黑，越高颜色越明显 |
+
+**色调模式原理**：每个像素 `RGB × (tint_brightness / gray)`，将所有"on"模块压暗到近似统一的亮度水平，同时保留原始色调。默认 64 适合扫码，值越低越接近纯黑。
+
+### 配置文件 `toqart.toml`
 
 ```toml
 [qart]
 use_pattern = false
+use_color = false
+color_threshold = 0
+use_color_tint = false
+tint_brightness = 64
 qr_version = 11
 x_aspect = 1
 y_aspect = 1
@@ -88,10 +104,11 @@ input_path = "example/101798742.jpg"
 output_path = "./toqart"
 ```
 
-## 备注
+```bash
+# 生成默认配置
+./target/release/toqart --create-config
+```
 
-- 运行时可能会看到 FFmpeg 的信息，如：
-  `[swscaler @ ...] deprecated pixel format used, make sure you did set range correctly`。
-  这是 swscaler 的提示，通常不会影响输出；若需抑制，可通过程序内设置 FFmpeg 日志级别（已默认设置为 `Warning`）。
+## 致谢
 
-- 程序仍依赖 FFmpeg（通过 `ffmpeg-next` crate）进行解码/缩放等处理，即使输入是图像也会使用 FFmpeg 流程。
+感谢 [zhengkyl/fuqr](https://github.com/zhengkyl/fuqr) 项目。本项目的核心 QR 码生成逻辑源自 fuqr 的 examples/bad_apple.rs。

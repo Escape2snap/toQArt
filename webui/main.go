@@ -22,11 +22,19 @@ var toqartBinary string
 func main() {
 	toqartBinary = findToqartBinary()
 
+	port := "5462"
+	for i := 1; i < len(os.Args); i++ {
+		if os.Args[i] == "--port" && i+1 < len(os.Args) {
+			port = os.Args[i+1]
+			i++
+		}
+	}
+
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/generate", handleGenerate)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	addr := ":8080"
+	addr := ":" + port
 	fmt.Printf("toQArt WebUI 启动于 http://localhost%s\n", addr)
 	fmt.Printf("toqart 二进制路径: %s\n", toqartBinary)
 	if err := http.ListenAndServe(addr, nil); err != nil {

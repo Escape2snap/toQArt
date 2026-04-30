@@ -25,9 +25,12 @@ struct Config {
 struct QArtConfig {
     use_pattern: bool,
     use_color: bool,
+    #[serde(default)]
+    color_threshold: u8,
+    #[serde(default)]
     use_color_tint: bool,
+    #[serde(default)]
     tint_brightness: u8,
-    use_color_threshold: u8,
     qr_version: usize,
     x_aspect: usize,
     y_aspect: usize,
@@ -52,7 +55,7 @@ fn get_default_config() -> Config {
             use_color: false,
             use_color_tint: false,
             tint_brightness: 64,
-            use_color_threshold: 0,
+            color_threshold: 0,
             qr_version: 11,
             x_aspect: 1,
             y_aspect: 1,
@@ -129,7 +132,7 @@ fn parse_cli_args(args: &[String]) -> Result<(Option<String>, Config), String> {
                         return Err("--color-threshold requires a value".to_string());
                     }
                     i += 1;
-                    config.qart.use_color_threshold = args[i].parse()
+                    config.qart.color_threshold = args[i].parse()
                         .map_err(|_| "Invalid color-threshold".to_string())?;
                 }
                 "color-tint" => {
@@ -320,7 +323,7 @@ fn main() {
     let pad_r = config.qart.pad_r;
     let qr_content = config.qart.content.clone();
     let threshold = config.qart.threshold;
-    let color_threshold = config.qart.use_color_threshold;
+    let color_threshold = config.qart.color_threshold;
     let use_color_tint = config.qart.use_color_tint;
     let tint_brightness = config.qart.tint_brightness;
     

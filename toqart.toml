@@ -1,5 +1,9 @@
 [qart]
 use_pattern = false
+use_color = false
+color_threshold = 0
+use_color_tint = false
+tint_brightness = 64
 qr_version = 11
 x_aspect = 1
 y_aspect = 1
