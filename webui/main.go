@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"image"
@@ -13,16 +14,19 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"strings"
 	"time"
 )
 
 var toqartBinary string
+var appLogger *Logger
 
 func main() {
 	toqartBinary = findToqartBinary()
 
 	port := "5462"
+	var logFmt, logOut string
 	for i := 1; i < len(os.Args); i++ {
 		if os.Args[i] == "--port" && i+1 < len(os.Args) {
 			port = os.Args[i+1]
@@ -30,11 +34,29 @@ func main() {
 		} else if os.Args[i] == "--toqart" && i+1 < len(os.Args) {
 			toqartBinary = os.Args[i+1]
 			i++
+		} else if os.Args[i] == "--log" {
+			logFmt = "plain"
+		} else if strings.HasPrefix(os.Args[i], "--log=") {
+			logFmt = os.Args[i][6:]
+		} else if os.Args[i] == "--log-out" && i+1 < len(os.Args) {
+			logOut = os.Args[i+1]
+			i++
 		}
 	}
 
-	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/generate", handleGenerate)
+	if logFmt != "" {
+		var err error
+		appLogger, err = newLogger(logFmt, logOut)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create logger: %s\n", err)
+			os.Exit(1)
+		}
+		defer appLogger.file.Close()
+		fmt.Printf("Logging to %s [%s]\n", appLogger.file.Name(), logFmt)
+	}
+
+	http.HandleFunc("/", logMiddleware(handleIndex, "index page"))
+	http.HandleFunc("/generate", logMiddleware(handleGenerate, "generate QR code"))
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	addr := ":" + port
@@ -156,6 +178,82 @@ func boolFlag(s string) string {
 		return "1"
 	}
 	return "0"
+}
+
+// ── Logger ──────────────────────────────────────────────
+
+type Logger struct {
+	mu     sync.Mutex
+	format string
+	file   *os.File
+	w      io.Writer
+}
+
+func newLogger(format, outPath string) (*Logger, error) {
+	if outPath == "" {
+		now := time.Now()
+		filename := fmt.Sprintf("%s.log", now.Format("20060102_150405"))
+		outPath = filepath.Join("log", filename)
+	}
+	if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, err
+	}
+	return &Logger{
+		format: format,
+		file:   f,
+		w:      io.MultiWriter(os.Stdout, f),
+	}, nil
+}
+
+func (l *Logger) Print(method, ip, action string) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now().Format(time.RFC3339)
+	switch l.format {
+	case "json":
+		data, _ := json.Marshal(map[string]string{
+			"time":   now,
+			"method": method,
+			"ip":     ip,
+			"action": action,
+		})
+		fmt.Fprintln(l.w, string(data))
+	default:
+		fmt.Fprintf(l.w, "%s | %s | %s\n", method, ip, action)
+	}
+}
+
+func getIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return strings.TrimSpace(xff)
+	}
+	ip := r.RemoteAddr
+	if i := strings.LastIndex(ip, ":"); i >= 0 {
+		ip = ip[:i]
+	}
+	return ip
+}
+
+func logMiddleware(next http.HandlerFunc, action string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if appLogger != nil {
+			appLogger.Print(r.Method, getIP(r), action)
+		}
+		next(w, r)
+	}
 }
 
 // ── Handlers ─────────────────────────────────────────────

@@ -4,3 +4,5 @@
 output_qr.png
 toqart-webui
 .claude
+/webui/log
+.log
