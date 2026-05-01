@@ -11,6 +11,8 @@
 - **图案模式** — 基于阈值和网格的装饰性图案
 - 支持 WebUI 和命令行两种使用方式
 - 配置与 `toqart.toml` 文件合并（优先级：CLI > toml > 默认值）
+- WebUI 暗色模式，支持 Auto / Light / Dark 切换
+- WebUI 请求日志（plain / JSON 格式）
 
 ## 快速开始
 
@@ -44,11 +46,31 @@ cd webui && go build -o toqart-webui main.go && cd ..
 
 ```bash
 cd webui
-./toqart-webui                    # 默认端口 5462
-./toqart-webui --port 8080        # 指定端口
+./toqart-webui                              # 默认端口 5462
+./toqart-webui --port 8080                  # 指定端口
+./toqart-webui --toqart ./bin/toqart        # 指定后端二进制路径（远端部署用）
+./toqart-webui --log                        # 启用请求日志（plain 格式）
+./toqart-webui --log=json                   # JSON 格式日志
+./toqart-webui --log --log-out /tmp/log     # 指定日志文件路径
 ```
 
 浏览器打开 `http://localhost:5462`。
+
+**WebUI 参数：**
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `--port` | `5462` | 监听端口 |
+| `--toqart <path>` | 自动查找 | toqart 后端二进制路径，远端部署时使用 |
+| `--log` / `--log=<plain\|json>` | — | 启用请求日志，`--log` 默认 plain 格式 |
+| `--log-out <path>` | `./log/{时间戳}.log` | 日志输出文件路径。不指定时自动创建 |
+
+**日志格式：**
+
+- plain: `GET \| 127.0.0.1 \| index page`
+- json: `{"time":"...","method":"GET","ip":"...","action":"..."}`
+
+IP 获取顺序：`X-Real-IP` → `X-Forwarded-For` → `RemoteAddr`。
 
 ## 参数说明
 
