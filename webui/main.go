@@ -27,6 +27,9 @@ func main() {
 		if os.Args[i] == "--port" && i+1 < len(os.Args) {
 			port = os.Args[i+1]
 			i++
+		} else if os.Args[i] == "--toqart" && i+1 < len(os.Args) {
+			toqartBinary = os.Args[i+1]
+			i++
 		}
 	}
 
@@ -35,8 +38,8 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	addr := ":" + port
-	fmt.Printf("toQArt WebUI 启动于 http://localhost%s\n", addr)
-	fmt.Printf("toqart 二进制路径: %s\n", toqartBinary)
+	fmt.Printf("toQArt WebUI started at http://localhost%s\n", addr)
+	fmt.Printf("toqart binary: %s\n", toqartBinary)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		panic(err)
 	}
@@ -177,14 +180,14 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	// ── Save uploaded file ──
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "请选择一张图片")
+		writeError(w, http.StatusBadRequest, "Please select an image")
 		return
 	}
 	defer file.Close()
 
 	tmpDir, err := os.MkdirTemp("", "toqart-upload-*")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "服务器错误")
+		writeError(w, http.StatusInternalServerError, "Server error")
 		return
 	}
 	defer os.RemoveAll(tmpDir)
@@ -196,7 +199,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	inputPath := filepath.Join(tmpDir, "input"+ext)
 	dst, err := os.Create(inputPath)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "服务器错误")
+		writeError(w, http.StatusInternalServerError, "Server error")
 		return
 	}
 	io.Copy(dst, file)
@@ -206,7 +209,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	mode := r.FormValue("mode")
 	if mode == "invert" {
 		if err := invertImage(inputPath); err != nil {
-			writeError(w, http.StatusInternalServerError, "图片反色失败: "+err.Error())
+			writeError(w, http.StatusInternalServerError, "Image invert failed: "+err.Error())
 			return
 		}
 	}
@@ -284,14 +287,14 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	output, err := exec.Command(toqartBinary, args...).CombinedOutput()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError,
-			fmt.Sprintf("执行 toqart 失败:\n%s\n%s", string(output), err))
+			fmt.Sprintf("toqart execution failed:\n%s\n%s", string(output), err))
 		return
 	}
 
 	resultFile, err := findFirstPNG(outDir)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError,
-			fmt.Sprintf("未找到生成的二维码图片\n二进制输出: %s\n", string(output)))
+			fmt.Sprintf("No QR code image found\nbinary output: %s\n", string(output)))
 		return
 	}
 
@@ -299,7 +302,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if scale > 1 {
 		resultFile, err = scaleImage(resultFile, scale)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "缩放图片失败")
+			writeError(w, http.StatusInternalServerError, "Image scale failed")
 			return
 		}
 	}
