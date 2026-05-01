@@ -20,6 +20,7 @@ import (
 )
 
 var toqartBinary string
+var buildTime string
 var appLogger *Logger
 
 func main() {
@@ -62,6 +63,9 @@ func main() {
 	addr := ":" + port
 	fmt.Printf("toQArt WebUI started at http://localhost%s\n", addr)
 	fmt.Printf("toqart binary: %s\n", toqartBinary)
+	if buildTime != "" {
+		fmt.Printf("build time: %s\n", buildTime)
+	}
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		panic(err)
 	}

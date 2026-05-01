@@ -23,7 +23,7 @@
 cargo build --release
 
 # 构建 WebUI（可选）
-cd webui && go build -o toqart-webui main.go && cd ..
+cd webui && go build -ldflags="-X main.buildTime=$(date +%Y%m%d_%H%M%S)" -o toqart-webui . && cd ..
 ```
 
 ### 命令行使用
