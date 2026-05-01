@@ -391,6 +391,7 @@ h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
 let currentFile = null;
 let sourceImage = null;
 let resultBlob = null;
+let resultFilename = "";
 let toastTimer = null;
 let currentTheme = localStorage.getItem('toqart-theme') || 'auto';
 
@@ -545,6 +546,11 @@ async function generate() {
     if (!resp.ok) throw new Error(await resp.text());
     resultBlob = await resp.blob();
     resultImg.src = URL.createObjectURL(resultBlob);
+    const cd = resp.headers.get('Content-Disposition');
+    if (cd) {
+      const m = cd.match(/filename="?([^"]+)"?/);
+      if (m) resultFilename = m[1];
+    }
     resultCard.classList.add('show');
   } catch (err) {
     showError(err.message);
@@ -559,7 +565,7 @@ function downloadResult() {
   if (!resultBlob) return;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(resultBlob);
-  a.download = `toqart_${Date.now()}.png`;
+  a.download = resultFilename || `toqart_${Date.now()}.png`;
   a.click();
 }
 
