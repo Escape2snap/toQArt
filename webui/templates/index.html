@@ -489,10 +489,18 @@ function handleFile(file) {
     uploadZone.classList.add('has-image');
     fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
     const img = new Image();
-    img.onload = () => { sourceImage = img; renderThreshold(); };
+    img.onload = () => { sourceImage = img; setAspectRatio(img.naturalWidth, img.naturalHeight); renderThreshold(); };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// ── Aspect Ratio ──
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function setAspectRatio(w, h) {
+  const g = gcd(w, h);
+  $('x_aspect').value = w / g;
+  $('y_aspect').value = h / g;
 }
 
 // ── Threshold Preview ──
