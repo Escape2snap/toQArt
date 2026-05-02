@@ -53,7 +53,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer appLogger.file.Close()
-		fmt.Printf("Logging to %s [%s]\n", appLogger.file.Name(), logFmt)
+		fmt.Printf("[%s] Logging to %s [%s]\n", time.Now().Format("2006-01-02 15:04:05"), appLogger.file.Name(), logFmt)
 	}
 
 	http.HandleFunc("/", logMiddleware(handleIndex, "index page"))
@@ -61,10 +61,10 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	addr := ":" + port
-	fmt.Printf("toQArt WebUI started at http://localhost%s\n", addr)
-	fmt.Printf("toqart binary: %s\n", toqartBinary)
+	fmt.Printf("[%s] toQArt WebUI started at http://localhost%s\n", time.Now().Format("2006-01-02 15:04:05"), addr)
+	fmt.Printf("[%s] toqart binary: %s\n", time.Now().Format("2006-01-02 15:04:05"), toqartBinary)
 	if buildTime != "" {
-		fmt.Printf("build time: %s\n", buildTime)
+		fmt.Printf("[%s] build time: %s\n", time.Now().Format("2006-01-02 15:04:05"), buildTime)
 	}
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		panic(err)
@@ -219,7 +219,7 @@ func (l *Logger) Print(method, ip, action string) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().Format("2006-01-02 15:04:05")
 	switch l.format {
 	case "json":
 		data, _ := json.Marshal(map[string]string{
@@ -230,7 +230,7 @@ func (l *Logger) Print(method, ip, action string) {
 		})
 		fmt.Fprintln(l.w, string(data))
 	default:
-		fmt.Fprintf(l.w, "%s | %s | %s\n", method, ip, action)
+		fmt.Fprintf(l.w, "[%s] %s | %s | %s\n", now, method, ip, action)
 	}
 }
 
@@ -356,15 +356,15 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 	if useColor == "true" {
 		args = append(args, "--color", "true")
+		if colorThreshold > 0 {
+			args = append(args, "--color-threshold", strconv.Itoa(colorThreshold))
+		}
 	}
 	if useColorTint == "true" {
 		args = append(args, "--color-tint", "true")
 		if tintBrightness > 0 {
 			args = append(args, "--tint-brightness", strconv.Itoa(tintBrightness))
 		}
-	}
-	if colorThreshold > 0 {
-		args = append(args, "--color-threshold", strconv.Itoa(colorThreshold))
 	}
 	if version > 0 {
 		args = append(args, "--qr-version", strconv.Itoa(version))
