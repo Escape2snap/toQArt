@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -22,12 +23,13 @@ import (
 var toqartBinary string
 var buildTime string
 var appLogger *Logger
+var appFooter string
 
 func main() {
 	toqartBinary = findToqartBinary()
 
 	port := "5462"
-	var logFmt, logOut string
+	var logFmt, logOut, footerPath string
 	for i := 1; i < len(os.Args); i++ {
 		if os.Args[i] == "--port" && i+1 < len(os.Args) {
 			port = os.Args[i+1]
@@ -42,6 +44,9 @@ func main() {
 		} else if os.Args[i] == "--log-out" && i+1 < len(os.Args) {
 			logOut = os.Args[i+1]
 			i++
+		} else if os.Args[i] == "--footer" && i+1 < len(os.Args) {
+			footerPath = os.Args[i+1]
+			i++
 		}
 	}
 
@@ -54,6 +59,15 @@ func main() {
 		}
 		defer appLogger.file.Close()
 		fmt.Printf("[%s] Logging to %s [%s]\n", time.Now().Format("2006-01-02 15:04:05"), appLogger.file.Name(), logFmt)
+	}
+
+	if footerPath != "" {
+		data, err := os.ReadFile(footerPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read footer: %s\n", err)
+			os.Exit(1)
+		}
+		appFooter = string(data)
 	}
 
 	http.HandleFunc("/", logMiddleware(handleIndex, "index page"))
@@ -268,7 +282,14 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	tmpl.Execute(w, nil)
+	if appFooter == "" {
+		tmpl.Execute(w, nil)
+		return
+	}
+	var buf bytes.Buffer
+	tmpl.Execute(&buf, nil)
+	body := strings.Replace(buf.String(), "</body>", appFooter+"</body>", 1)
+	w.Write([]byte(body))
 }
 
 func handleGenerate(w http.ResponseWriter, r *http.Request) {

@@ -13,6 +13,7 @@
 - 配置与 `toqart.toml` 文件合并（优先级：CLI > toml > 默认值）
 - WebUI 暗色模式，支持 Auto / Light / Dark 切换
 - WebUI 请求日志（plain / JSON 格式）
+- Makefile 一键构建，支持 systemd 部署
 
 ## 快速开始
 
@@ -20,10 +21,19 @@
 
 ```bash
 # 需要 Rust、Go、FFmpeg 开发库
-cargo build --release
 
-# 构建 WebUI（可选）
-cd webui && go build -ldflags="-X main.buildTime=$(date +%Y%m%d_%H%M%S)" -o toqart-webui . && cd ..
+# 使用 Makefile 一键构建（推荐）
+make
+
+# 或分别构建
+make toqart     # Rust 后端
+make webui      # Go WebUI（自动注入编译时间）
+make run-webui  # 构建并启动 WebUI
+make clean      # 清理构建产物
+
+# 构建产物
+# - target/release/toqart     (Rust 后端, ~6.5MB)
+# - webui/toqart-webui        (Go WebUI, ~13MB)
 ```
 
 ### 命令行使用
@@ -56,6 +66,12 @@ cd webui
 
 浏览器打开 `http://localhost:5462`。
 
+**WebUI 特性：**
+- **暗色模式** — 支持 Auto / Light / Dark 切换，跟随系统或手动选择，配色持久化到 localStorage
+- **上传图片自动设宽高比** — X/Y 宽高比自动按图片原始比例（约分到最简整数）设置
+- **下载文件名** — 下载按钮使用服务端生成的文件名，包含 QR 参数信息
+- **编译时间** — 启动时显示构建时间，便于版本追溯
+
 **WebUI 参数：**
 
 | 参数 | 默认 | 说明 |
@@ -64,13 +80,31 @@ cd webui
 | `--toqart <path>` | 自动查找 | toqart 后端二进制路径，远端部署时使用 |
 | `--log` / `--log=<plain\|json>` | — | 启用请求日志，`--log` 默认 plain 格式 |
 | `--log-out <path>` | `./log/{时间戳}.log` | 日志输出文件路径。不指定时自动创建 |
+| `--footer <path>` | — | 注入页脚 HTML 文件内容到页面底部，自动适配暗色/亮色模式 |
 
 **日志格式：**
 
-- plain: `GET \| 127.0.0.1 \| index page`
-- json: `{"time":"...","method":"GET","ip":"...","action":"..."}`
+- plain: `[2026-05-02 20:01:30] GET | 127.0.0.1 | index page`
+- json: `{"time":"2026-05-02 20:01:30","method":"GET","ip":"127.0.0.1","action":"index page"}`
 
+不指定 `--log-out` 时，日志自动写入 `./log/{启动时间戳}.log`，同时输出到控制台。
 IP 获取顺序：`X-Real-IP` → `X-Forwarded-For` → `RemoteAddr`。
+
+### 部署（systemd）
+
+项目附带 `toqart-webui.service`，可用于 Linux 服务器自启动管理：
+
+```bash
+# 安装服务
+sudo cp toqart-webui.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now toqart-webui
+
+# 管理
+sudo systemctl status toqart-webui
+sudo journalctl -u toqart-webui -f   # 查看实时日志
+sudo systemctl stop|start|restart toqart-webui
+```
 
 ## 参数说明
 

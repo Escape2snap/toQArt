@@ -222,6 +222,22 @@ h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Footer ── */
+.footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 12px;
+  color: var(--text-hint);
+}
+.footer a {
+  color: var(--text-hint);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer a:hover {
+  color: var(--accent);
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .config-grid { grid-template-columns: 1fr; }
